@@ -2,12 +2,11 @@
 import urllib.request
 import gzip
 from lxml import etree
-# import requests
-# import json
+import time
 
 
 def read_map(city: str) -> str:
-    webmap = gzip.open(urllib.request.urlopen(city), 'r')  # opening online-archive to get XML map file
+    webmap = gzip.open(urllib.request.urlopen(city), 'r')  # opening web-archive to get XML map file
     map_name = 'map.osm'
     file = open(map_name, 'w', encoding='UTF-8')
 
@@ -20,132 +19,72 @@ def read_map(city: str) -> str:
     return map_name
 
 
-def get_places(map_name: str, places_we_need: list) -> dict:
-    f = open('names.csv', 'w')
-    names = dict()
-    root = etree.parse(map_name).getroot()  # got the element tree root of XML file
+def get_node_coordinates(node: etree._Element, root: etree._Element = None, node_id: str = None) -> (float, float):
+    if node.tag == 'node':
+        return float(node.attrib['lat']), float(node.attrib['lon'])
+    elif node.tag == 'way':
+        if node_id is None:
+            node_id = node.getchildren()[0].attrib['ref']
 
-    # getting places names and their coordinates
+        if root is not None:
+            for child in root.getchildren():
+                if (child.tag == 'node') and (child.attrib['id'] == node_id):
+                    return float(child.attrib['lat']), float(child.attrib['lon'])
+        else:
+            return -2, -2
+    else:
+        return -1, -1
+
+
+def get_node_name(node: etree._Element) -> str:
+    for child in node.getchildren():
+        if ('k' in child.attrib.keys()) and (child.attrib['k'] == 'name'):
+            return child.attrib['v']
+
+
+def get_places(map_name: str, ks: list, vs: list) -> dict:
+    places = dict()
+    root = etree.parse(map_name).getroot()
+    i = 0
+    t0 = time.time()
     for child in root.getchildren():
-        if child.tag == 'node':
+        if child.getchildren() is not None:
             for grandchild in child.getchildren():
-                if (grandchild is not None) and (grandchild.tag == 'tag') and (
-                        grandchild.attrib['k'] == 'tourism') and (grandchild.attrib['v'] in places_we_need):
-                    for c in child.getchildren():
-                        if c.attrib['k'] == 'name':
-                            names[c.attrib['v']] = (child.attrib['lat'], child.attrib['lon'])
+                if (grandchild.tag == 'tag') and (grandchild.attrib['k'] in ks) and (grandchild.attrib['v'] in vs):
+                    i += 1
+                    coors = get_node_coordinates(child, root)
+                    if coors == (-1, -1):
+                        continue
+                    places[str(get_node_name(child)).replace('None', 'None' + str(i))] = coors
+                    print(i, time.time() - t0, sep='\n')
 
-    print(len(names), 'names done')
-    f.write('name,lat,lon\n')
+    print('dict done')
+    i = 0
 
-    # saving to .csv because i want
-    # might delete later on
-    for name in names.keys():
-        f.write(name + ',' + names[name][0] + ',' + names[name][1] + '\n')
+    file = open('names.csv', 'w', encoding='UTF-8')
+    for place in places.keys():
+        i += 1
+        file.write(str(place).replace(',', '_-_').replace('"', "'") + ',' + str(places[place][0]) + ',' + str(places[place][1]) + '\n')
+    file.close()
 
-    f.close()
-    return names
+    print(i)
+
+    return places
 
 
 def main() -> int:
     # found this places manually, yet to be updated
-    # (it's only tourism tagged places, must find others keys and their values that we need)
-    tourism = ['museum', 'artwork', 'theme_park', 'zoo', 'gallery', 'aquarium', 'attraction', 'viewpoint']
+    # (it's just a few places, must find other keys and their values that we need)
+    keys = ['tourism', 'amenity', 'disused:amenity']
+    values = ['museum', 'artwork', 'theme_park', 'zoo', 'gallery', 'aquarium', 'attraction', 'viewpoint', 'place_of_worship']
+    print('hello')
     url_moscow = "https://download.bbbike.org/osm/bbbike/Moscow/Moscow.osm.gz"
     url_spb = "https://download.bbbike.org/osm/bbbike/SanktPetersburg/SanktPetersburg.osm.gz"
-    map_ = read_map(url_moscow)
-    places = get_places(map_, tourism)
-    print(len(places.keys()), 'names returned')
+    map_ = 'map.osm'  # read_map(url_moscow)
+    pls = get_places(map_, keys, values)
     print('end')
     return 0
 
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-# ignore this
-# s.cpp execute
-import os
-import subprocess
-
-os.system('/Users/mjlq2/PycharmProjects/untitled/s')
-# subprocess.run('/Users/mjlq2/PycharmProjects/untitled/s')
-'''
-
-
-'''
-# evaluating route
-router = Router('bus')
-
-    start = router.findNode(55.751177, 37.633280)
-    end = router.findNode(55.759923, 37.625686)
-    print('b')
-    status, route = router.doRoute(start, end)
-    print('c')
-    if status == 'success':
-        routeLatLons = list(map(router.nodeLatLon, route))
-
-    sum_ = 0
-
-    for i in range(len(routeLatLons) - 1):
-        sum_ += router.distance(routeLatLons[i], routeLatLons[i + 1])
-
-    print(sum_)
-'''
-
-
-'''
-# probably useless
-data = requests.get('https://apidata.mos.ru/v1/datasets/527/rows/?api_key=da77fc2dc5912ea2890050390f522d99')
-
-dct = json.loads(data.text)
-
-names = list()
-
-for i in range(len(dct)):
-    names.append(dct[i]['Cells']['CommonName'].replace('«', '"').replace('»', '"'))
-
-
-print('names done\n', names)
-'''
