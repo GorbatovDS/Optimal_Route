@@ -21,6 +21,7 @@ def read_map(city: str) -> str:
 
     file.close()
     print('map done')
+    
     return map_name
 
 
@@ -74,7 +75,6 @@ def get_places(map_name: str, ks: list, vs: list) -> str:
     places = dict()
     root = etree.parse(map_name).getroot()
     i = 0
-    t0 = time.time()
     for child in root.getchildren():
         if child.getchildren() is not None:
             for grandchild in child.getchildren():
@@ -84,21 +84,16 @@ def get_places(map_name: str, ks: list, vs: list) -> str:
                     if coors == (-1, -1):
                         continue
                     places[str(get_node_name(child)).replace('None', 'None' + str(i))] = coors
-                    print(i, time.time() - t0, sep='\n')
 
     print('dict done')
-    i = 0
 
     names_file = 'names.csv'
 
     file = open(names_file, 'w', encoding='UTF-8')
     file.write('name,lat,lon')
     for place in places.keys():
-        i += 1
         file.write(str(place).replace(',', '_-_').replace('"', "'") + ',' + str(places[place][0]) + ',' + str(places[place][1]) + '\n')
     file.close()
-
-    print(i)
 
     return names_file
 
@@ -152,6 +147,7 @@ def find_route(names: list, pos: (float, float), file_name: str = 'names.csv') -
         file_m.write('\n')
 
     file_m.close()
+    
     return places_number_name
 
 
@@ -173,6 +169,7 @@ def main() -> int:
     names.sort()
     print(find_route(names[:5], (0, 0)))
     print('end')
+    
     return 0
 
 
